@@ -265,9 +265,18 @@ class RecoveryExecutor(object):
             try:
                 # TODO: Stop early if taget-immediate
                 # Retrieve a list of required log files
+                # required_xlog_files = tuple(
+                #     self.server.get_required_xlog_files(
+                #         backup_info, target_tli, recovery_info["target_epoch"]
+                #     )
+                # )
                 required_xlog_files = tuple(
-                    self.server.get_required_xlog_files(
-                        backup_info, target_tli, recovery_info["target_epoch"]
+                    self.server.get_required_wal(
+                        backup_info,
+                        target_tli=target_tli,
+                        target_time=recovery_info["target_epoch"],
+                        include_history=True,
+                        from_backup_only=True,
                     )
                 )
 

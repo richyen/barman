@@ -1468,6 +1468,72 @@ class Server(RemoteStatusMixin):
                 if xlog.is_history_file(wal_info.name):
                     yield wal_info
 
+    def get_required_wal(
+        self,
+        backup,
+        target_tli=None,
+        target_time=None,
+        include_history=False,
+        from_backup_only=False,
+    ):
+        """
+        Supposed to merge both get_required_xlog_files and get_wal_until_next_backup
+
+        :param BackupInfo backup: a backup object, the starting point
+            to retrieve WALs
+        :param target_tli:
+        :param target_time:
+        :param bool include_history: option for the inclusion of history files into the output
+        :param bool from_backup_only: if set, get_required_xlog_files.
+        """
+        begin = backup.begin_wal
+        next_end = None
+
+        if from_backup_only:
+            end = backup.end_wal
+            max_tli = target_tli
+            if not target_tli:
+                max_tli, _, _ = xlog.decode_segment_name(end)
+        else:
+            if self.get_next_backup(backup.backup_id):
+                next_end = self.get_next_backup(backup.backup_id).end_wal
+            max_tli, _, _ = xlog.decode_segment_name(begin)
+
+        with self.xlogdb() as fxlogdb:
+            for line in fxlogdb:
+                wal_info = WalFileInfo.from_xlogdb_line(line)
+                # Handle .history files: add all of them to the output,
+                # regardless of their age, if requested (the 'include_history'
+                # parameter is True)
+                if xlog.is_history_file(wal_info.name):
+                    if include_history:
+                        yield wal_info
+                    continue
+                if wal_info.name < begin:
+                    continue
+                tli, _, _ = xlog.decode_segment_name(wal_info.name)
+                if tli > max_tli:
+                    continue
+                if from_backup_only:
+                    yield wal_info
+                    if wal_info.name > end:
+                        end = wal_info.name
+                        if target_time and wal_info.time > target_time:
+                            break
+                else:
+                    if not xlog.is_wal_file(wal_info.name):
+                        continue
+                    if next_end and wal_info.name > next_end:
+                        break
+                    yield wal_info
+            # return all the remaining history files
+            for line in fxlogdb:
+                if not include_history:
+                    break
+                wal_info = WalFileInfo.from_xlogdb_line(line)
+                if xlog.is_history_file(wal_info.name):
+                    yield wal_info
+
     # TODO: merge with the previous
     def get_wal_until_next_backup(self, backup, include_history=False):
         """
@@ -1584,7 +1650,8 @@ class Server(RemoteStatusMixin):
         # WAL rate (default 0.0 per second)
         wal_info["wals_per_second"] = 0.0
 
-        for item in self.get_wal_until_next_backup(backup_info):
+        # for item in self.get_wal_until_next_backup(backup_info):
+        for item in self.get_required_wal(backup_info):
             if item.name == begin:
                 wal_info["wal_first"] = item.name
                 wal_info["wal_first_timestamp"] = item.time
