@@ -355,10 +355,10 @@ class WalFileInfo(FieldListFile):
         return obj
 
     @classmethod
-    def from_file_with_compression(cls, filename, compression_manager,
-                                   unidentified_compression=None, **kwargs):
-        obj = WalFileInfo.from_file(filename,
-                                    unidentified_compression, *kwargs)
+    def from_file_with_compression(
+        cls, filename, compression_manager, unidentified_compression=None, **kwargs
+    ):
+        obj = WalFileInfo.from_file(filename, unidentified_compression, *kwargs)
 
         obj.compression = compression_manager.identify_compression(filename)
 
