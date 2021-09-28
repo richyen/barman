@@ -563,7 +563,6 @@ class TestServer(object):
     # def get_wals_
     # def test_get_wal_until_next_backup(self):
 
-
     # @patch("barman.server.Server.get_wal_until_next_backup")
     @patch("barman.server.Server.get_required_wal")
     def test_get_wal_info(self, get_wal_mock, tmpdir):
